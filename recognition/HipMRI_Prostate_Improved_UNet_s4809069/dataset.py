@@ -75,8 +75,8 @@ class HipMRIDataset(Dataset):
         mask_path = os.path.join(self.mask_dir, mask_name)
 
         # load mask
-        mask = load_data_2D([mask_path], categorical=False)[0]
-        mask = np.expand_dims(mask, axis=0)
+        mask = load_data_2D([mask_path], categorical=True, dtype=np.float32)[0]
+        mask = np.transpose(mask, (2, 0, 1))  
         mask_tensor = torch.tensor(mask, dtype=torch.float32)
 
         # apply transforms

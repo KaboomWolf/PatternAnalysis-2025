@@ -34,7 +34,7 @@ class UNet(nn.Module):
     Inspired by https://github.com/aladdinpersson/Machine-Learning-Collection/
     and Isensee et al Improved UNet
     """
-    def __init__(self, in_channels=3, out_channels=1, features=[64, 128, 256, 512], dropout_p=0.2):
+    def __init__(self, in_channels=3, out_channels=3, features=[64, 128, 256, 512], dropout_p=0.2):
         super().__init__()
 
         self.upsample = nn.ModuleList()
@@ -61,7 +61,14 @@ class UNet(nn.Module):
         self.bottleneck = ResidualBlock(features[-1], features[-1] * 2, dropout_p=dropout_p)
         self.out = nn.Conv2d(features[0], out_channels, kernel_size=1)
 
+        # deep supervision
+        self.deep_supervision_heads = nn.ModuleList([
+            nn.Conv2d(feature, out_channels, kernel_size=1)
+            for feature in reversed(features[1:])  # exclude the final output
+        ])
+
     def forward(self, x):
+        input_size = x.shape[2:]  
         skip_connections = []
         
         # Encoder
@@ -77,6 +84,7 @@ class UNet(nn.Module):
         skip_connections = skip_connections[::-1]       
 
         # Decoder
+        deep_outputs = []  
         for idx, convTranspose in enumerate(self.upsample):
             x = convTranspose(x)
             upDoubleConv = self.upblock[idx]
@@ -88,4 +96,16 @@ class UNet(nn.Module):
             # add skip connection to channel dim + upsample
             x = upDoubleConv(torch.cat((skip_connections[idx], x), dim=1))
 
-        return self.out(x)
+            # add deep supervision
+            if idx < len(self.deep_supervision_heads):
+                deep_pred = self.deep_supervision_heads[idx](x)
+                deep_pred = F.interpolate(deep_pred, size=input_size, mode='bilinear', align_corners=True)
+                deep_outputs.append(deep_pred)
+
+        output = self.out(x)
+
+        if self.training:
+            return [output] + deep_outputs
+        else:
+            return output
+        
