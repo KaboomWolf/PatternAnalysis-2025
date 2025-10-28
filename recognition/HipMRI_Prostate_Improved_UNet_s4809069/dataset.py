@@ -4,6 +4,7 @@ from torch.utils.data import Dataset
 import numpy as np
 import nibabel as nib
 from tqdm import tqdm
+import torch.nn.functional as F
 
 def to_channels(arr: np.ndarray, dtype=np.uint8) -> np.ndarray:
     channels = np.unique(arr)
@@ -28,7 +29,7 @@ def load_data_2D(imageNames, normImage=False, categorical=False, dtype=np.float3
         rows, cols = first_case.shape
         images = np.zeros((num, rows, cols), dtype=dtype)
 
-    for i, inName in enumerate(tqdm(imageNames)):
+    for i, inName in enumerate(tqdm(imageNames, disable=True)):
         niftiImage = nib.load(inName)
         inImage = niftiImage.get_fdata(caching='unchanged')
         affine = niftiImage.affine
@@ -46,6 +47,42 @@ def load_data_2D(imageNames, normImage=False, categorical=False, dtype=np.float3
         if i > 20 and early_stop:
             break
     return (images, affines) if getAffines else images
+
+def remap_labels(mask):
+    """
+    Ensure labels are in 0-5 range.
+    """
+    mask = mask.copy()
+    mask[mask > 5] = 5  # clip any extra values
+    return mask
+
+def to_onehot(arr: np.ndarray, num_classes=6, dtype=np.float32) -> np.ndarray:
+    """
+    Convert integer mask to one-hot encoding with fixed number of classes.
+    """
+    shape = arr.shape
+    res = np.zeros((num_classes, *shape), dtype=dtype)
+    for c in range(num_classes):
+        res[c][arr == c] = 1
+    return res
+
+def resize_image(img, size=(256, 256), mode='bilinear'):
+    """
+    img: np.ndarray or torch.Tensor of shape [C, H, W]
+    size: target (H, W)
+    """
+    if isinstance(img, np.ndarray):
+        img = torch.tensor(img, dtype=torch.float32)
+    
+    img = img.unsqueeze(0)
+
+    if mode in ['bilinear', 'linear', 'bicubic', 'trilinear']:
+        img = F.interpolate(img, size=size, mode=mode, align_corners=True)
+    else:
+        img = F.interpolate(img, size=size, mode=mode)
+
+    img = img.squeeze(0)
+    return img
 
 class HipMRIDataset(Dataset):
     def __init__(self, img_dir, mask_dir, transform=None):
@@ -67,6 +104,7 @@ class HipMRIDataset(Dataset):
 
         # add channel dimension
         img = np.expand_dims(img, axis=0) # add channel for [C, H, W]
+        img = resize_image(img, size=(256, 128), mode='bilinear')
         img_tensor = torch.tensor(img, dtype=torch.float32)
 
         # convert between img and mask names
@@ -75,8 +113,10 @@ class HipMRIDataset(Dataset):
         mask_path = os.path.join(self.mask_dir, mask_name)
 
         # load mask
-        mask = load_data_2D([mask_path], categorical=True, dtype=np.float32)[0]
-        mask = np.transpose(mask, (2, 0, 1))  
+        mask = load_data_2D([mask_path], categorical=False, dtype=np.float32)[0]
+        mask = remap_labels(mask)
+        mask = to_onehot(mask, num_classes=6)
+        mask = resize_image(mask, size=(256, 128), mode='nearest')
         mask_tensor = torch.tensor(mask, dtype=torch.float32)
 
         # apply transforms

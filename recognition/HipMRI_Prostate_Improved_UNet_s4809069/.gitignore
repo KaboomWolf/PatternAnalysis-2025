@@ -2,3 +2,4 @@
 /venv
 /keras_slices_data
 /testing
+/__pycache__
