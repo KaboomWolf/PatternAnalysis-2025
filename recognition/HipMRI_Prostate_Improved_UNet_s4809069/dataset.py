@@ -48,43 +48,65 @@ def load_data_2D(imageNames, normImage=False, categorical=False, dtype=np.float3
             break
     return (images, affines) if getAffines else images
 
-def remap_labels(mask):
+def to_onehot(arr, num_classes=6, dtype=np.float32):
     """
-    Ensure labels are in 0-5 range.
-    """
-    mask = mask.copy()
-    mask[mask > 5] = 5  # clip any extra values
-    return mask
+    Convert class index to one hot encoded mask.
 
-def to_onehot(arr: np.ndarray, num_classes=6, dtype=np.float32) -> np.ndarray:
-    """
-    Convert integer mask to one-hot encoding with fixed number of classes.
+    Args:
+        arr (np.ndarray): Input mask with integer class labels
+        num_classes (int, optional): Number of classes in ground truth.
+        dtype (_type_, optional): Data type of the output one-hot array.
+             Defaults to np.float32.
+
+    Returns:
+        np.ndarray: One-hot encoded array
     """
     shape = arr.shape
-    res = np.zeros((num_classes, *shape), dtype=dtype)
-    for c in range(num_classes):
-        res[c][arr == c] = 1
-    return res
 
-def resize_image(img, size=(256, 256), mode='bilinear'):
+    # initialise empty array to hold one-hot mask
+    masks = np.zeros((num_classes, *shape), dtype=dtype)
+
+    # add each one hot mask to array
+    for class_id in range(num_classes):
+        masks[class_id][arr == class_id] = 1
+    
+    return masks
+
+def resize_image(img, size=(256, 128), mode='bilinear'):
     """
-    img: np.ndarray or torch.Tensor of shape [C, H, W]
-    size: target (H, W)
+    Resizes image to the specified size with PyTorch interpolation.
+
+    Args:
+        img (torch.Tensor or np.ndarray): Input image
+        size (tuple, optional): target size of image. Defaults to (256, 128).
+        mode (str, optional): Interpolation mode. Defaults to 'bilinear'.
+
+    Returns:
+        torch.Tensor: Resized image tensor
     """
+    # convert np array to tensor
     if isinstance(img, np.ndarray):
         img = torch.tensor(img, dtype=torch.float32)
     
+    # turn [C, H, W] into [N, C, H, W]
     img = img.unsqueeze(0)
 
+    # align corners for modes that allow it
     if mode in ['bilinear', 'linear', 'bicubic', 'trilinear']:
         img = F.interpolate(img, size=size, mode=mode, align_corners=True)
     else:
         img = F.interpolate(img, size=size, mode=mode)
 
+    # remove extra dimension needed for interpolate
     img = img.squeeze(0)
     return img
 
+
 class HipMRIDataset(Dataset):
+    """
+    HipMRI dataset for Hip MRI and segmentation masks.
+
+    """
     def __init__(self, img_dir, mask_dir, transform=None):
         self.img_dir = img_dir
         self.mask_dir = mask_dir
@@ -114,10 +136,11 @@ class HipMRIDataset(Dataset):
 
         # load mask
         mask = load_data_2D([mask_path], categorical=False, dtype=np.float32)[0]
-        mask = remap_labels(mask)
         mask = to_onehot(mask, num_classes=6)
-        mask = resize_image(mask, size=(256, 128), mode='nearest')
+
         mask_tensor = torch.tensor(mask, dtype=torch.float32)
+        mask_tensor = F.interpolate(mask_tensor.unsqueeze(0), size=(256,128), mode='nearest').squeeze(0)
+        mask_tensor = (mask_tensor > 0.5).float()
 
         # apply transforms
         if self.transform:
