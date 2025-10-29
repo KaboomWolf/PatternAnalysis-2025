@@ -3,6 +3,9 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import numpy as np 
+
 from collections import Counter
 
 def mean_dice_score(outputs, targets, num_classes):
@@ -188,3 +191,71 @@ def plot_training_curve(filename, train_losses, val_losses):
 
     # save image
     plt.savefig(filename, dpi=300, bbox_inches='tight')
+
+CLASS_COLORS = np.array([
+    [0, 0, 0],         # bg
+    [255, 0, 0],       # body
+    [0, 255, 0],       # bones
+    [0, 0, 255],       # bladder
+    [255, 255, 0],     # rectum
+    [0, 255, 255],     # prostate
+], dtype=np.uint8)
+
+CLASS_LABELS = [
+    "Background", 
+    "Body",
+    "Bones",
+    "Bladder",
+    "Rectum",
+    "Prostate"
+]
+
+def colorize_mask(mask):
+    """
+    Convert grayscale mask into RGB mask for visualisation
+
+    Args:
+        mask (np.ndarray): 2D array of mask containing class labels
+
+    Returns:
+        np.ndarray: array of RGB image with pixels coloured based on 
+            class label
+    """
+    mask_rgb = CLASS_COLORS[mask]
+    return mask_rgb
+
+def save_comparison_image(filename, img_gray, ground_truth_rgb, pred_rgb):
+    """
+    Create a side-by-side comparison of input image, predicted mask, and 
+    the ground truth mask.
+
+    Args:
+        filename (str): location to save output image
+        img_gray (np.ndarray): grayscale input image
+        ground_truth_rgb (np.ndarray): ground truth segmentation
+        pred_rgb (np.ndarray): predicted segmentation
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    axes[0].imshow(img_gray, cmap="gray")
+    axes[0].set_title("Input Image")
+    axes[0].axis("off")
+
+    axes[1].imshow(ground_truth_rgb)
+    axes[1].set_title("Ground Truth")
+    axes[1].axis("off")
+
+    axes[2].imshow(pred_rgb)
+    axes[2].set_title("Predicted Mask")
+    axes[2].axis("off")
+
+    # Convert colors to matplotlib patches for legend
+    patches = [
+        mpatches.Patch(color=[c/255 for c in col], label=lbl) 
+        for col, lbl in zip(CLASS_COLORS, CLASS_LABELS)
+    ]
+
+    fig.legend(handles=patches, loc='lower center', ncol=6, bbox_to_anchor=(0.5, -0.1))
+
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close(fig)
