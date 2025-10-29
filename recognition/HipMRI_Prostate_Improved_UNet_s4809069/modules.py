@@ -107,7 +107,7 @@ class UNet(nn.Module):
         if self.training:
             return [output] + deep_outputs
         else:
-            return output
+            return [output]
         
 
 class CombinedLoss(nn.Module):
