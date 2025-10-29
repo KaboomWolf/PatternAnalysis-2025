@@ -109,3 +109,45 @@ class UNet(nn.Module):
         else:
             return output
         
+
+class CombinedLoss(nn.Module):
+    def __init__(self, class_weights=None, dice_weight=1, ce_weight=1):
+        super().__init__()
+        self.class_weights = class_weights
+        self.ce_weight = ce_weight
+        self.dice_weight = dice_weight
+        self.offset = 1e-6 # prevent zero division
+
+    def forward(self, preds, targets):
+        # Dice
+        probs = F.softmax(preds, dim=1)
+
+        # target resizing to output if needed
+        if probs.shape != targets.shape:
+            targets = F.interpolate(targets, size=probs.shape[2:], mode='nearest')
+
+        # flatten to compute per class sums
+        B, C, H, W = probs.shape
+        probs_flat = probs.view(B, C, -1)
+        targets_flat = targets.view(B, C, -1)
+
+        # calculate dice loss
+        intersection = (probs_flat * targets_flat).sum(-1)
+        union = probs_flat.sum(-1) + targets_flat.sum(-1)
+        dice_per_class = (2.0 * intersection + self.offset) / (union + self.offset)
+        dice_loss_per_class = 1 - dice_per_class.mean(0) 
+
+        # apply weighting if specified
+        if self.class_weights is None:
+            # average across all classes
+            dice_loss = dice_loss_per_class.mean()
+        else:
+            # compute a weighted average
+            dice_loss = (dice_loss_per_class * self.class_weights).sum() / self.class_weights.sum()
+
+        # CE part
+        ce_loss = F.cross_entropy(preds, torch.argmax(targets, dim=1), weight=self.class_weights)
+
+        return self.dice_weight * dice_loss + self.ce_weight * ce_loss
+
+
