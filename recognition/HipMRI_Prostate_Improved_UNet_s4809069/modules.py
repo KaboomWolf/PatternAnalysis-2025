@@ -10,24 +10,35 @@ class ResidualBlock(nn.Module):
     """
     def __init__(self, in_channels, out_channels, dropout_p=0.2):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
-        self.norm = nn.InstanceNorm2d(out_channels)
-        self.act = nn.LeakyReLU(negative_slope=0.2, inplace=True)
+        self.norm1 = nn.InstanceNorm2d(in_channels)
+        self.act1 = nn.LeakyReLU(0.2, inplace=True)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
+
+        self.norm2 = nn.InstanceNorm2d(out_channels)
+        self.act2 = nn.LeakyReLU(0.2, inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
+
         self.drop = nn.Dropout(dropout_p)
-        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
-        self.res = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1) if in_channels != out_channels else nn.Identity()
+        self.res = (
+            nn.Conv2d(in_channels, out_channels, kernel_size=1)
+            if in_channels != out_channels
+            else nn.Identity()
+        )
 
     def forward(self, x):
-        res = self.res(x)
-        x = self.conv1(x)
-        x = self.norm(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.conv2(x)
-        x = self.norm(x)
-        x = self.act(x)
-        x = self.drop(x)
-        return x + res
+        residual = self.res(x)
+        out = self.norm1(x)
+        out = self.act1(out)
+        out = self.drop(out)
+        out = self.conv1(out)
+
+        out = self.norm2(out)
+        out = self.act2(out)
+        out = self.drop(out)
+        out = self.conv2(out)
+
+        out = out + residual
+        return out
         
 class UNet(nn.Module):
     """
