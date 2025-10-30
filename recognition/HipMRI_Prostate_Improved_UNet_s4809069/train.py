@@ -12,20 +12,20 @@ from utils import mean_dice_score, intersection_union_values, count_pixels, save
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_SIZE = 8
 LR = 1e-4
-MAX_EPOCHS = 2
-TARGET_DICE = 0.9
+MAX_EPOCHS = 100
+TARGET_DICE = 0.8
 NUM_CLASSES = 6
-SAVE_PATH = "test_unet_prostate.pth"
+SAVE_PATH = "unet_prostate.pth"
 
 # -----------------------------
 # Paths
 # -----------------------------
 # checkpoints
-checkpoint_dir = './checkpoints/test_unet_checkpoints'
+checkpoint_dir = './checkpoints/unet_checkpoints'
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 # logging
-log_dir = "./checkpoints/test_logs"
+log_dir = "./checkpoints/logs"
 os.makedirs(log_dir, exist_ok=True)
 
 base_img_path = "keras_slices_data/"
@@ -135,7 +135,7 @@ for epoch in range(MAX_EPOCHS):
     # print and save logs
     save_logs(
         log_dir=log_dir,
-        epoch=epoch + 1,
+        epoch=epoch,
         max_epochs=MAX_EPOCHS,
         avg_train_loss=avg_train_loss,
         mean_train_dices=mean_train_dices,
@@ -169,13 +169,12 @@ for epoch in range(MAX_EPOCHS):
 final_state = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
 torch.save(final_state, SAVE_PATH)
 print(f"Model saved to {SAVE_PATH}")
-np.savez("loss_history_test.npz", train_losses=train_losses, val_losses=val_losses)
 
 # -----------------------------
 # Plot training curve
 # -----------------------------
 plot_training_curve(
-    filename="training_loss_test.png",
+    filename="training_loss.png",
     train_losses=train_losses,
     val_losses=val_losses
 )

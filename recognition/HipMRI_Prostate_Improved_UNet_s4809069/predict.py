@@ -10,8 +10,8 @@ from utils import intersection_union_values, colorize_mask, save_comparison_imag
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NUM_CLASSES = 6
 BATCH_SIZE = 8
-MODEL_PATH = "./unet_prostate2.pth"
-SAVE_DIR = "./test_predictions"
+MODEL_PATH = "./unet_prostate.pth"
+SAVE_DIR = "./predictions"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 # ---------------------
