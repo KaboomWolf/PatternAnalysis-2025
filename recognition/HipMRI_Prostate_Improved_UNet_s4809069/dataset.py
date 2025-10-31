@@ -7,6 +7,16 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 def to_channels(arr: np.ndarray, dtype=np.uint8) -> np.ndarray:
+    """
+    Convert 2D integer mask into one hot array in numpy format
+
+    Args:
+        arr (np.ndarray): 2D array of integer class labels 
+        dtype (type, optional): Desired output type for output. Defaults to np.uint8.
+
+    Returns:
+        np.ndarray: one-hot encoded array
+    """
     channels = np.unique(arr)
     res = np.zeros(arr.shape + (len(channels),), dtype=dtype)
     for c in channels:
@@ -15,6 +25,22 @@ def to_channels(arr: np.ndarray, dtype=np.uint8) -> np.ndarray:
     return res
 
 def load_data_2D(imageNames, normImage=False, categorical=False, dtype=np.float32, getAffines=False, early_stop=False):
+    """
+    Load a list of 2D medical images (e.g., NIfTI files) into a NumPy array.
+
+    Args:
+        imageNames (list[str]): List of file paths to image files
+        normImage (bool, optional): normalize each image to zero mean and unit variance. Defaults to False.
+        categorical (bool, optional): convert each integer-valued label map into a 
+            one-hot-like multi-channel representation. Defaults to False.
+        dtype (np.dtype, optional): Data type for output arrays. Defaults to np.float32.
+        getAffines (bool, optional): return a tuple `(images, affines)` where `affines` 
+            contains the affine matrices of each image. Defaults to False.
+        early_stop (bool, optional): stop loading after 20 images. Defaults to False.
+
+    Returns:
+        np.ndarray or tuple
+    """
     affines = []
     num = len(imageNames)
     first_case = nib.load(imageNames[0]).get_fdata(caching='unchanged')
@@ -59,7 +85,7 @@ def to_onehot(arr, num_classes=6, dtype=np.float32):
              Defaults to np.float32.
 
     Returns:
-        np.ndarray: One-hot encoded array
+        np.ndarray: One-hot encoded array for pytorch
     """
     shape = arr.shape
 
