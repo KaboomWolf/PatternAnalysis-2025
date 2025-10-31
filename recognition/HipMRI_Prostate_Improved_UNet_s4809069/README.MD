@@ -19,7 +19,7 @@ Medical image segmentation allows identification of specific regions of interest
 ### Dependencies
 A python installation is required to run the model generation and validation code. Python `3.13.5` was used during training on Rangpur. The code has been tested on python `3.11.2`, so a it is suggested an installation of `3.11.2` or higher is used. PyTorch was the chosen machine learning library for training.
 
-Project dependencies can be installed from `requirements.txt` using the command `  pip install -r requirements.txt`. The following libraries should be installed:
+Project dependencies can be installed from `requirements.txt` using the command `pip install -r requirements.txt`. The following libraries should be installed:
 
 ```
 matplotlib==3.10.7
